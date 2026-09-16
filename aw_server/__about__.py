@@ -10,13 +10,14 @@ logger = logging.getLogger(__name__)
 
 # TODO: Remove reliance on
 basever = "v0.12"
+basever = "0.12"
 
 srcpath = Path(__file__).absolute().parent
 projectpath = srcpath.parent
 bundlepath = projectpath.parent  # the ActivityWatch bundle repo, in some circumstances
 
 # This line set by script when run (metaprogramming)
-__version__ = "v0-baseline.dev+7de21fc"
+__version__ = "0.12.dev+7de21fc"
 
 
 def get_rev():
