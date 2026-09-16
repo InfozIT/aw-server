@@ -15,7 +15,7 @@ class InfozITSyncThread(threading.Thread):
         self.api = api
         self.interval = interval_seconds
         self.last_sync = datetime.now(timezone.utc) - timedelta(seconds=interval_seconds)
-        self.backend_url = "http://localhost:3030/api/tracker/sync/events"
+        self.backend_url = "https://2ml9h49p-9000.inc1.devtunnels.ms/api/tracker/sync/events"
 
     def run(self):
         logger.info(f"InfozIT Sync Thread started, interval: {self.interval}s")
