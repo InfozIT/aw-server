@@ -18,6 +18,7 @@ from . import rest
 from .api import ServerAPI
 from .custom_static import get_custom_static_blueprint
 from .log import FlaskLogHandler
+from .infozit_sync import InfozITSyncThread
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +130,11 @@ def _start(
         cors_origins=cors_origins,
         custom_static=custom_static,
     )
+    
+    # Start the background sync thread
+    sync_thread = InfozITSyncThread(api=app.api, interval_seconds=60)
+    sync_thread.start()
+
     try:
         app.run(
             debug=testing,

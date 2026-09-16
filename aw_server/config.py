@@ -6,6 +6,7 @@ host = "localhost"
 port = "5600"
 storage = "peewee"
 cors_origins = ""
+activation_key = ""
 
 [server.custom_static]
 
