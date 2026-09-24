@@ -39,6 +39,67 @@ def main():
         logger.info(f"Using custom_static: {settings.custom_static}")
 
     logger.info("Starting up...")
+    
+    # --- INFOZIT FIRST-RUN WIZARD ---
+    try:
+        from .config import config as aw_config
+        activation_key = aw_config.get("server", {}).get("activation_key", "")
+        
+        if not activation_key:
+            logger.info("Activation key missing, prompting user via tkinter...")
+            import tkinter as tk
+            from tkinter import simpledialog
+            import tomlkit
+            import os
+            from aw_core.dirs import get_config_dir
+            
+            root = tk.Tk()
+            root.withdraw() # Hide the main window
+            
+            # Make sure the dialog comes to the front
+            root.lift()
+            root.attributes('-topmost', True)
+            
+            user_key = simpledialog.askstring(
+                title="InfozIT Tracker Setup",
+                prompt="Welcome! Please enter your InfozIT Activation Key to begin tracking:",
+                parent=root
+            )
+            
+            root.destroy()
+            
+            if user_key and user_key.strip():
+                user_key = user_key.strip()
+                config_dir = get_config_dir("aw-server")
+                config_file = os.path.join(config_dir, "aw-server.toml")
+                
+                # Load existing toml to preserve comments
+                if os.path.exists(config_file):
+                    with open(config_file, "r") as f:
+                        data = tomlkit.parse(f.read())
+                else:
+                    data = tomlkit.document()
+                    
+                if "server" not in data:
+                    data["server"] = tomlkit.table()
+                
+                data["server"]["activation_key"] = user_key
+                
+                with open(config_file, "w") as f:
+                    f.write(tomlkit.dumps(data))
+                    
+                logger.info("Activation key saved successfully.")
+                
+                # Update memory config so sync thread sees it immediately
+                if "server" not in aw_config:
+                    aw_config["server"] = {}
+                aw_config["server"]["activation_key"] = user_key
+            else:
+                logger.warning("No activation key entered. Tracker sync will not work until configured.")
+    except Exception as e:
+        logger.error(f"Failed to prompt for activation key: {e}")
+    # --------------------------------
+
     _start(
         host=settings.host,
         port=settings.port,

@@ -1,10 +1,15 @@
 import threading
 import time
 import logging
+import uuid
 from datetime import datetime, timezone, timedelta
 import urllib.request
 import urllib.error
 import json
+import subprocess
+import platform
+import socket
+import getpass
 from aw_core.config import load_config_toml
 
 logger = logging.getLogger(__name__)
@@ -15,7 +20,41 @@ class InfozITSyncThread(threading.Thread):
         self.api = api
         self.interval = interval_seconds
         self.last_sync = datetime.now(timezone.utc) - timedelta(seconds=interval_seconds)
-        self.backend_url = "https://2ml9h49p-9000.inc1.devtunnels.ms/api/tracker/sync/events"
+        self.backend_url = "https://2ml9h49p-9002.inc1.devtunnels.ms/api/tracker/sync/events"
+        
+        # Get the system MAC address formatted as XX:XX:XX:XX:XX:XX
+        mac_num = uuid.getnode()
+        self.mac_address = ':'.join(('%012X' % mac_num)[i:i+2] for i in range(0, 12, 2))
+        self.hardware_id = self._get_hardware_uuid()
+        
+        # System & User Info
+        self.os_type = platform.system()
+        self.os_version = platform.release()
+        self.hostname = socket.gethostname()
+        try:
+            self.os_user = getpass.getuser()
+        except Exception:
+            self.os_user = "unknown"
+
+    def _get_hardware_uuid(self):
+        os_type = platform.system()
+        try:
+            if os_type == "Windows":
+                output = subprocess.check_output('wmic csproduct get uuid', shell=True).decode().split('\n')[1].strip()
+                return output if output else "unknown-windows-uuid"
+            elif os_type == "Darwin":
+                output = subprocess.check_output("/usr/sbin/ioreg -rd1 -c IOPlatformExpertDevice | grep 'IOPlatformUUID'", shell=True).decode()
+                parts = output.split('"')
+                if len(parts) >= 4:
+                    return parts[3]
+                return "unknown-mac-uuid"
+            elif os_type == "Linux":
+                with open('/etc/machine-id', 'r') as f:
+                    return f.read().strip()
+        except Exception as e:
+            logger.error(f"Failed to get hardware UUID: {e}")
+            
+        return "unknown-hardware-uuid"
 
     def run(self):
         logger.info(f"InfozIT Sync Thread started, interval: {self.interval}s")
@@ -60,8 +99,13 @@ class InfozITSyncThread(threading.Thread):
                         "bucket": client_name,
                     }
                     if client_name.startswith("aw-watcher-window"):
-                        formatted_event["app"] = ev.get("data", {}).get("app", "unknown")
-                        formatted_event["title"] = ev.get("data", {}).get("title", "")
+                        data = ev.get("data", {})
+                        formatted_event["app"] = data.get("app", "unknown")
+                        formatted_event["title"] = data.get("title", "")
+                        if "url" in data:
+                            formatted_event["url"] = data.get("url")
+                        if "incognito" in data:
+                            formatted_event["incognito"] = data.get("incognito")
                         formatted_event["is_afk"] = False
                     elif client_name.startswith("aw-watcher-afk"):
                         status = ev.get("data", {}).get("status", "")
@@ -82,6 +126,12 @@ class InfozITSyncThread(threading.Thread):
             req = urllib.request.Request(self.backend_url, method="POST")
             req.add_header('Content-Type', 'application/json')
             req.add_header('x-activation-key', activation_key)
+            req.add_header('x-mac-address', self.mac_address)
+            req.add_header('x-hardware-id', self.hardware_id)
+            req.add_header('x-os-type', self.os_type)
+            req.add_header('x-os-version', self.os_version)
+            req.add_header('x-hostname', self.hostname)
+            req.add_header('x-os-user', self.os_user)
             
             payload = json.dumps({"events": all_events}).encode('utf-8')
             
