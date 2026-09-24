@@ -40,8 +40,9 @@ class InfozITSyncThread(threading.Thread):
         os_type = platform.system()
         try:
             if os_type == "Windows":
-                output = subprocess.check_output('wmic csproduct get uuid', shell=True).decode().split('\n')[1].strip()
-                return output if output else "unknown-windows-uuid"
+                import winreg
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Cryptography") as key:
+                    return str(winreg.QueryValueEx(key, "MachineGuid")[0])
             elif os_type == "Darwin":
                 output = subprocess.check_output("/usr/sbin/ioreg -rd1 -c IOPlatformExpertDevice | grep 'IOPlatformUUID'", shell=True).decode()
                 parts = output.split('"')
